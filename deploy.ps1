@@ -1,14 +1,42 @@
 # PowerShell script for deploying and running pipelines
 
+# Create default .env file if it doesn't exist
+if (-not (Test-Path .env)) {
+    Write-Host "Creating default .env file from env.example" -ForegroundColor Yellow
+    if (Test-Path env.example) {
+        Copy-Item env.example .env
+        Write-Host "Default .env file created. You may want to edit it with your custom settings." -ForegroundColor Green
+    } else {
+        Write-Host "WARNING: env.example not found. Creating minimal .env file." -ForegroundColor Yellow
+        @"
+# Airflow settings
+AIRFLOW_UID=50000
+AIRFLOW_GID=50000
+AIRFLOW_USERNAME=airflow
+AIRFLOW_PASSWORD=airflow123
+
+# PostgreSQL settings
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+
+# Data Warehouse settings
+POSTGRES_DW_USER=dataeng
+POSTGRES_DW_PASSWORD=dataeng123
+
+# Optional: Slack webhook for notifications
+# SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your/webhook/url
+"@ | Out-File -FilePath .env -Encoding utf8
+        Write-Host "Minimal .env file created." -ForegroundColor Green
+    }
+}
+
 # Load environment variables from .env file if it exists
-if (Test-Path .env) {
-    Write-Host "Loading environment variables from .env file" -ForegroundColor Green
-    Get-Content .env | ForEach-Object {
-        $line = $_.Trim()
-        if ($line -and !$line.StartsWith('#')) {
-            $key, $value = $line -split '=', 2
-            [Environment]::SetEnvironmentVariable($key, $value, 'Process')
-        }
+Write-Host "Loading environment variables from .env file" -ForegroundColor Green
+Get-Content .env | ForEach-Object {
+    $line = $_.Trim()
+    if ($line -and !$line.StartsWith('#')) {
+        $key, $value = $line -split '=', 2
+        [Environment]::SetEnvironmentVariable($key, $value, 'Process')
     }
 }
 

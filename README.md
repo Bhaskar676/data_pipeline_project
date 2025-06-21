@@ -20,12 +20,7 @@ This project requires Docker and Docker Compose to run.
    cd pipeline_assesment
    ```
 
-2. Create a `.env` file from the example:
-   ```bash
-   cp env.example .env
-   ```
-
-3. Deploy and run the pipeline:
+2. Deploy and run the pipeline:
 
    **For Linux/macOS:**
    ```bash
@@ -38,7 +33,13 @@ This project requires Docker and Docker Compose to run.
    .\deploy.ps1
    ```
 
-4. Access the Airflow UI:
+   The deployment scripts will:
+   - Create a default `.env` file if one doesn't exist
+   - Deploy all containers
+   - Run the pipelines automatically
+   - Display results and access information
+
+3. Access the Airflow UI:
    - URL: http://localhost:8080
    - Username: airflow (or as set in .env)
    - Password: airflow123 (or as set in .env)
@@ -109,15 +110,28 @@ The deployment scripts automatically configure these connections in Airflow duri
 
 ### Environment Configuration
 
-1. Create a `.env` file with your configuration:
-   ```bash
-   cp env.example .env
-   # Edit the .env file with your settings
+The deployment scripts will automatically create a default `.env` file if one doesn't exist. You can customize this file with your own settings:
+
+1. Default settings created by the scripts:
+   ```
+   # Airflow settings
+   AIRFLOW_UID=50000
+   AIRFLOW_GID=50000
+   AIRFLOW_USERNAME=airflow
+   AIRFLOW_PASSWORD=airflow123
+   
+   # PostgreSQL settings
+   POSTGRES_USER=postgres
+   POSTGRES_PASSWORD=postgres
+   
+   # Data Warehouse settings
+   POSTGRES_DW_USER=dataeng
+   POSTGRES_DW_PASSWORD=dataeng123
    ```
 
-2. Optional configurations:
+2. Optional configurations to add:
    - `SLACK_WEBHOOK_URL`: Slack webhook URL for alerts
-   - `SMTP_PASSWORD`: SMTP password for email alerts
+   - SMTP settings for email alerts
 
 ## Project Structure
 

@@ -1,11 +1,39 @@
 #!/bin/bash
 set -e
 
-# Load environment variables from .env file if it exists
-if [ -f .env ]; then
-  echo "Loading environment variables from .env file"
-  export $(grep -v '^#' .env | xargs)
+# Create default .env file if it doesn't exist
+if [ ! -f .env ]; then
+  echo "Creating default .env file from env.example"
+  if [ -f env.example ]; then
+    cp env.example .env
+    echo "Default .env file created. You may want to edit it with your custom settings."
+  else
+    echo "WARNING: env.example not found. Creating minimal .env file."
+    cat > .env << EOL
+# Airflow settings
+AIRFLOW_UID=50000
+AIRFLOW_GID=50000
+AIRFLOW_USERNAME=airflow
+AIRFLOW_PASSWORD=airflow123
+
+# PostgreSQL settings
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+
+# Data Warehouse settings
+POSTGRES_DW_USER=dataeng
+POSTGRES_DW_PASSWORD=dataeng123
+
+# Optional: Slack webhook for notifications
+# SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your/webhook/url
+EOL
+    echo "Minimal .env file created."
+  fi
 fi
+
+# Load environment variables from .env file
+echo "Loading environment variables from .env file"
+export $(grep -v '^#' .env | xargs)
 
 # Function to wait for service to be healthy
 wait_for_service() {
