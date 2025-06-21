@@ -1,52 +1,5 @@
 version: '3.8'
 
-x-airflow-common:
-  &airflow-common
-  image: ${DOCKER_REGISTRY:-localhost}/airflow-pipeline:${TAG:-latest}
-  build:
-    context: .
-    dockerfile: Dockerfile.airflow
-  environment:
-    &airflow-common-env
-    AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-    AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY:-Wb2wbqOTpeiGYalyIxtnnDXfVOqJLk_lGksM6s_JTRU=}'
-    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'  # Changed to false for CI/CD
-    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
-    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
-    AIRFLOW__WEBSERVER__AUTHENTICATE: 'true'
-    AIRFLOW__WEBSERVER__AUTH_USER_REGISTRATION: 'false'
-    # Email alerts configuration
-    AIRFLOW__EMAIL__EMAIL_BACKEND: 'airflow.utils.email.send_email_smtp'
-    AIRFLOW__SMTP__SMTP_HOST: '${SMTP_HOST:-smtp.gmail.com}'
-    AIRFLOW__SMTP__SMTP_PORT: '${SMTP_PORT:-587}'
-    AIRFLOW__SMTP__SMTP_USER: '${SMTP_USER:-}'
-    AIRFLOW__SMTP__SMTP_PASSWORD: '${SMTP_PASSWORD:-}'
-    AIRFLOW__SMTP__SMTP_MAIL_FROM: '${SMTP_MAIL_FROM:-}'
-    AIRFLOW__SMTP__SMTP_SSL: '${SMTP_SSL:-False}'
-    AIRFLOW__SMTP__SMTP_STARTTLS: '${SMTP_STARTTLS:-True}'
-    # Slack alerts configuration
-    AIRFLOW__SLACK__SLACK_WEBHOOK_CONN_ID: 'slack_webhook'
-    # Default alert settings
-    AIRFLOW_USERNAME: ${AIRFLOW_USERNAME:-airflow}
-    AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD:-airflow123}
-    AIRFLOW_EMAIL: ${AIRFLOW_EMAIL:-admin@example.com}
-    _PIP_ADDITIONAL_REQUIREMENTS: 'requests beautifulsoup4 psycopg2-binary pandas numpy apache-airflow-providers-slack'
-  volumes:
-    - ./dags:/opt/airflow/dags
-    - ./logs:/opt/airflow/logs
-    - ./plugins:/opt/airflow/plugins
-    - ./scripts:/opt/airflow/scripts
-    - ./data:/opt/airflow/data
-  user: "${AIRFLOW_UID:-50000}:0"
-  depends_on:
-    &airflow-common-depends-on
-    postgres:
-      condition: service_healthy
-
 services:
   # PostgreSQL for Airflow metadata
   postgres:
@@ -67,10 +20,7 @@ services:
 
   # Data warehouse PostgreSQL
   postgres_dw:
-    image: ${DOCKER_REGISTRY:-localhost}/postgres-dw:${TAG:-latest}
-    build:
-      context: .
-      dockerfile: Dockerfile.postgres-dw
+    image: postgres:13
     environment:
       POSTGRES_USER: dataeng
       POSTGRES_PASSWORD: ${POSTGRES_DW_PASSWORD:-dataeng123}
@@ -89,7 +39,42 @@ services:
 
   # Airflow webserver
   airflow-webserver:
-    <<: *airflow-common
+    image: apache/airflow:2.7.0-python3.10
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY:-Wb2wbqOTpeiGYalyIxtnnDXfVOqJLk_lGksM6s_JTRU=}'
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+      AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+      AIRFLOW__WEBSERVER__AUTHENTICATE: 'true'
+      AIRFLOW__WEBSERVER__AUTH_USER_REGISTRATION: 'false'
+      # Email alerts configuration
+      AIRFLOW__EMAIL__EMAIL_BACKEND: 'airflow.utils.email.send_email_smtp'
+      AIRFLOW__SMTP__SMTP_HOST: '${SMTP_HOST:-smtp.gmail.com}'
+      AIRFLOW__SMTP__SMTP_PORT: '${SMTP_PORT:-587}'
+      AIRFLOW__SMTP__SMTP_USER: '${SMTP_USER:-}'
+      AIRFLOW__SMTP__SMTP_PASSWORD: '${SMTP_PASSWORD:-}'
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: '${SMTP_MAIL_FROM:-}'
+      AIRFLOW__SMTP__SMTP_SSL: '${SMTP_SSL:-False}'
+      AIRFLOW__SMTP__SMTP_STARTTLS: '${SMTP_STARTTLS:-True}'
+      # Slack alerts configuration
+      AIRFLOW__SLACK__SLACK_WEBHOOK_CONN_ID: 'slack_webhook'
+      # Default alert settings
+      AIRFLOW_USERNAME: ${AIRFLOW_USERNAME:-airflow}
+      AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD:-airflow123}
+      AIRFLOW_EMAIL: ${AIRFLOW_EMAIL:-admin@example.com}
+      _PIP_ADDITIONAL_REQUIREMENTS: 'requests beautifulsoup4 psycopg2-binary pandas numpy apache-airflow-providers-slack'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./scripts:/opt/airflow/scripts
+      - ./data:/opt/airflow/data
+    user: "${AIRFLOW_UID:-50000}:0"
     ports:
       - "8080:8080"
     command: >
@@ -110,7 +95,42 @@ services:
 
   # Airflow scheduler
   airflow-scheduler:
-    <<: *airflow-common
+    image: apache/airflow:2.7.0-python3.10
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY:-Wb2wbqOTpeiGYalyIxtnnDXfVOqJLk_lGksM6s_JTRU=}'
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+      AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+      AIRFLOW__WEBSERVER__AUTHENTICATE: 'true'
+      AIRFLOW__WEBSERVER__AUTH_USER_REGISTRATION: 'false'
+      # Email alerts configuration
+      AIRFLOW__EMAIL__EMAIL_BACKEND: 'airflow.utils.email.send_email_smtp'
+      AIRFLOW__SMTP__SMTP_HOST: '${SMTP_HOST:-smtp.gmail.com}'
+      AIRFLOW__SMTP__SMTP_PORT: '${SMTP_PORT:-587}'
+      AIRFLOW__SMTP__SMTP_USER: '${SMTP_USER:-}'
+      AIRFLOW__SMTP__SMTP_PASSWORD: '${SMTP_PASSWORD:-}'
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: '${SMTP_MAIL_FROM:-}'
+      AIRFLOW__SMTP__SMTP_SSL: '${SMTP_SSL:-False}'
+      AIRFLOW__SMTP__SMTP_STARTTLS: '${SMTP_STARTTLS:-True}'
+      # Slack alerts configuration
+      AIRFLOW__SLACK__SLACK_WEBHOOK_CONN_ID: 'slack_webhook'
+      # Default alert settings
+      AIRFLOW_USERNAME: ${AIRFLOW_USERNAME:-airflow}
+      AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD:-airflow123}
+      AIRFLOW_EMAIL: ${AIRFLOW_EMAIL:-admin@example.com}
+      _PIP_ADDITIONAL_REQUIREMENTS: 'requests beautifulsoup4 psycopg2-binary pandas numpy apache-airflow-providers-slack'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./scripts:/opt/airflow/scripts
+      - ./data:/opt/airflow/data
+    user: "${AIRFLOW_UID:-50000}:0"
     command: airflow scheduler
     depends_on:
       postgres:

@@ -2,17 +2,15 @@
 
 This project contains two Airflow DAGs:
 1. `news_pipeline_dag` - Extracts news data from Finshots and YourStory
-2. `movielens_pipeline_dag` - Analyzes MovieLens data (depends on news_pipeline_dag)
+2. `movielens_pipeline_dag` - Analyzes MovieLens data
 
-## CI/CD Setup
+## Setup
 
-This project includes a complete CI/CD pipeline using GitHub Actions and Docker.
+This project requires Docker and Docker Compose to run.
 
 ### Prerequisites
 
 - Docker and Docker Compose
-- GitHub account with repository access
-- Server for deployment with Docker installed
 
 ### Local Development
 
@@ -27,31 +25,62 @@ This project includes a complete CI/CD pipeline using GitHub Actions and Docker.
    cp env.example .env
    ```
 
-3. Build and start the containers:
+3. Deploy and run the pipeline:
+
+   **For Linux/macOS:**
    ```bash
    chmod +x deploy.sh
-   ./deploy.sh build
-   ./deploy.sh deploy
+   ./deploy.sh
    ```
 
-4. Trigger the pipelines:
-   ```bash
-   ./deploy.sh trigger
+   **For Windows:**
+   ```powershell
+   .\deploy.ps1
    ```
 
-5. Access the Airflow UI:
+4. Access the Airflow UI:
    - URL: http://localhost:8080
    - Username: airflow (or as set in .env)
    - Password: airflow123 (or as set in .env)
 
-### CI/CD Pipeline
+### Running the Pipeline
 
-The CI/CD pipeline is configured in `.github/workflows/airflow-cicd.yml` and performs the following steps:
+The deployment scripts offer several commands:
 
-1. **Test**: Runs linting and unit tests on the DAGs
-2. **Build**: Builds and pushes Docker images to the registry
-3. **Deploy**: Deploys the stack to the server
-4. **Trigger**: Unpauses and triggers the DAGs automatically
+**For Linux/macOS:**
+```bash
+# Deploy containers only
+./deploy.sh deploy
+
+# Run the pipelines
+./deploy.sh run
+
+# Show pipeline results
+./deploy.sh results
+
+# Stop all containers
+./deploy.sh stop
+```
+
+**For Windows:**
+```powershell
+# Deploy containers only
+.\deploy.ps1 deploy
+
+# Run the pipelines
+.\deploy.ps1 run
+
+# Show pipeline results
+.\deploy.ps1 results
+
+# Stop all containers
+.\deploy.ps1 stop
+```
+
+The scripts will:
+1. Deploy the Docker containers
+2. Trigger the DAGs in sequence
+3. Display the results after completion
 
 ### Alerts and Notifications
 
@@ -76,42 +105,19 @@ To configure alerts:
    SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your/webhook/url
    ```
 
-The `deploy.sh` script automatically configures these connections in Airflow during deployment.
+The deployment scripts automatically configure these connections in Airflow during deployment.
 
-### GitHub Secrets Configuration
+### Environment Configuration
 
-Set up the following secrets in your GitHub repository:
-
-- `DOCKERHUB_USERNAME`: Docker Hub username
-- `DOCKERHUB_TOKEN`: Docker Hub access token
-- `SSH_HOST`: Deployment server hostname/IP
-- `SSH_USERNAME`: SSH username for the deployment server
-- `SSH_PRIVATE_KEY`: SSH private key for the deployment server
-- `SLACK_WEBHOOK_URL`: (Optional) Slack webhook URL for alerts
-- `SMTP_PASSWORD`: (Optional) SMTP password for email alerts
-
-### Deployment Server Setup
-
-1. Create a deployment directory:
-   ```bash
-   mkdir -p /path/to/deployment
-   ```
-
-2. Create a `.env` file with your configuration:
+1. Create a `.env` file with your configuration:
    ```bash
    cp env.example .env
    # Edit the .env file with your settings
    ```
 
-3. First-time manual deployment:
-   ```bash
-   cd /path/to/deployment
-   git clone <repository-url> .
-   ./deploy.sh deploy
-   ./deploy.sh trigger
-   ```
-
-After the initial setup, the CI/CD pipeline will handle all future deployments automatically.
+2. Optional configurations:
+   - `SLACK_WEBHOOK_URL`: Slack webhook URL for alerts
+   - `SMTP_PASSWORD`: SMTP password for email alerts
 
 ## Project Structure
 
@@ -120,9 +126,7 @@ After the initial setup, the CI/CD pipeline will handle all future deployments a
 - `data/`: Data files including MovieLens dataset
 - `logs/`: Airflow logs
 - `plugins/`: Airflow plugins
-- `.github/workflows/`: CI/CD workflow definitions
+- `deploy.sh`: Bash deployment script for Linux/macOS
+- `deploy.ps1`: PowerShell deployment script for Windows
 - `docker-compose.yml`: Docker Compose configuration
-- `Dockerfile.airflow`: Custom Airflow image definition
-- `Dockerfile.postgres-dw`: Custom PostgreSQL data warehouse image definition
-- `deploy.sh`: Deployment script
 - `requirements.txt`: Python dependencies 
