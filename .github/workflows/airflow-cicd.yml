@@ -1,0 +1,155 @@
+name: Airflow CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      trigger_dag:
+        description: 'Trigger DAG after deployment'
+        required: true
+        default: 'true'
+        type: boolean
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pylint
+          # Install any additional dependencies needed for testing
+          pip install apache-airflow pandas numpy
+
+      - name: Lint DAGs
+        run: |
+          pylint --disable=all --enable=F,E,W,R,C --ignore-patterns=__pycache__,\.git dags/
+
+      - name: Test DAGs
+        run: |
+          python -m pytest test_movielens.py -v
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create .env file
+        run: |
+          cat > .env << EOL
+          DOCKER_REGISTRY=${{ secrets.DOCKERHUB_USERNAME }}
+          TAG=${GITHUB_SHA::8}
+          
+          # Airflow
+          AIRFLOW_FERNET_KEY=${{ secrets.AIRFLOW_FERNET_KEY || 'Wb2wbqOTpeiGYalyIxtnnDXfVOqJLk_lGksM6s_JTRU=' }}
+          AIRFLOW_USERNAME=airflow
+          AIRFLOW_PASSWORD=${{ secrets.AIRFLOW_PASSWORD || 'airflow123' }}
+          AIRFLOW_EMAIL=${{ secrets.AIRFLOW_EMAIL || 'admin@example.com' }}
+          
+          # Email Alerts
+          SMTP_HOST=${{ secrets.SMTP_HOST || 'smtp.gmail.com' }}
+          SMTP_PORT=${{ secrets.SMTP_PORT || '587' }}
+          SMTP_USER=${{ secrets.SMTP_USER || '' }}
+          SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD || '' }}
+          SMTP_MAIL_FROM=${{ secrets.SMTP_MAIL_FROM || '' }}
+          
+          # Slack Alerts
+          SLACK_WEBHOOK_URL=${{ secrets.SLACK_WEBHOOK_URL || '' }}
+          
+          # Database
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD || 'airflow' }}
+          POSTGRES_DW_PASSWORD=${{ secrets.POSTGRES_DW_PASSWORD || 'dataeng123' }}
+          EOL
+
+      - name: Build and push Docker images
+        run: |
+          docker-compose build
+          docker-compose push
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /path/to/deployment
+            git pull
+            
+            # Create .env file on server
+            cat > .env << EOL
+            DOCKER_REGISTRY=${{ secrets.DOCKERHUB_USERNAME }}
+            TAG=${GITHUB_SHA::8}
+            
+            # Airflow
+            AIRFLOW_FERNET_KEY=${{ secrets.AIRFLOW_FERNET_KEY || 'Wb2wbqOTpeiGYalyIxtnnDXfVOqJLk_lGksM6s_JTRU=' }}
+            AIRFLOW_USERNAME=airflow
+            AIRFLOW_PASSWORD=${{ secrets.AIRFLOW_PASSWORD || 'airflow123' }}
+            AIRFLOW_EMAIL=${{ secrets.AIRFLOW_EMAIL || 'admin@example.com' }}
+            
+            # Email Alerts
+            SMTP_HOST=${{ secrets.SMTP_HOST || 'smtp.gmail.com' }}
+            SMTP_PORT=${{ secrets.SMTP_PORT || '587' }}
+            SMTP_USER=${{ secrets.SMTP_USER || '' }}
+            SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD || '' }}
+            SMTP_MAIL_FROM=${{ secrets.SMTP_MAIL_FROM || '' }}
+            
+            # Slack Alerts
+            SLACK_WEBHOOK_URL=${{ secrets.SLACK_WEBHOOK_URL || '' }}
+            
+            # Database
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD || 'airflow' }}
+            POSTGRES_DW_PASSWORD=${{ secrets.POSTGRES_DW_PASSWORD || 'dataeng123' }}
+            EOL
+            
+            docker-compose down
+            docker-compose pull
+            ./deploy.sh deploy
+            # Wait for Airflow webserver to be ready
+            echo "Waiting for Airflow webserver to be ready..."
+            sleep 30
+
+      - name: Unpause and trigger DAGs
+        if: ${{ github.event.inputs.trigger_dag == 'true' || github.event_name == 'push' }}
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /path/to/deployment
+            ./deploy.sh trigger
+            
+            # Get the log file and save as artifact
+            mkdir -p /tmp/pipeline-results
+            RUN_ID=$(docker-compose exec -T airflow-webserver airflow dags list-runs -d movielens_pipeline_dag -o json | python -c "import sys, json; print(json.load(sys.stdin)[0]['run_id'])")
+            LOG_PATH="/opt/airflow/logs/dag_id=movielens_pipeline_dag/run_id=${RUN_ID}/task_id=send_success_alert/attempt=1.log"
+            docker-compose exec -T airflow-webserver cat $LOG_PATH > /tmp/pipeline-results/results.log
+            
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: pipeline-results
+          path: /tmp/pipeline-results/ 

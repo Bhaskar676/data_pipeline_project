@@ -1,0 +1,11 @@
+FROM postgres:13
+
+# Copy initialization SQL scripts
+COPY init-warehouse.sql /docker-entrypoint-initdb.d/01-init-warehouse.sql
+COPY init-movielens.sql /docker-entrypoint-initdb.d/02-init-movielens.sql
+
+# Set permissions
+RUN chmod 644 /docker-entrypoint-initdb.d/*.sql
+
+# Health check
+HEALTHCHECK --interval=5s --timeout=5s --retries=3 CMD pg_isready -U dataeng 
